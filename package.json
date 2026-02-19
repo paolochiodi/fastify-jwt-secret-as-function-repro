@@ -1,0 +1,16 @@
+{
+  "name": "secret-issue-repro",
+  "version": "1.0.0",
+  "description": "Reproduction of @fastify/jwt secret-as-function inconsistency between request.jwtVerify() and fastify.jwt.verify()",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "fastify": "^5",
+    "@fastify/jwt": "^9"
+  }
+}
