@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "fastify": "^5",
-    "@fastify/jwt": "^9"
+    "@fastify/jwt": "file:../fastify-jwt"
   }
 }

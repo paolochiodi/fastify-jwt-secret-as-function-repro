@@ -11,45 +11,34 @@ const STATIC_TOKEN =
 const fastify = Fastify({ logger: true })
 
 // Register @fastify/jwt with a *function* as the secret option.
-// The documented signature is: (request, decodedToken) => secret
 //
-// However, when verify is called on the fastify instance (fastify.jwt.verify),
-// @fastify/jwt does NOT invoke this function itself. Instead it passes the raw
-// function to fast-jwt as the `key` option. fast-jwt then calls it with its own
-// signature: (decodedToken) — no request object at all.
+// With the fixed version of @fastify/jwt, the secret function uses a unified
+// SecretContext-based signature regardless of the call context:
+//   (context, callback) => void   OR   (context) => Promise<string>
 //
-// This means the first argument changes depending on the call context:
-//   - request.jwtVerify()     → secretFn(request, decodedToken)  ✅ correct
-//   - fastify.jwt.verify(tok) → secretFn(decodedToken)           ❌ inconsistent
+// The context object always contains: { operation, header, payload, signature }
+// When called from a request context, it also includes: { request }
+// When called from the fastify instance, `request` is undefined.
+//
+// This is consistent and predictable, unlike the original behavior where:
+//   - request.jwtVerify()     → secretFn(request, decodedToken, callback)
+//   - fastify.jwt.verify(tok) → secretFn(decodedToken, callback)  (called by fast-jwt directly)
 await fastify.register(fjwt, {
-  secret: function getSecret(requestOrToken, tokenOrCallback, maybeCallback) {
+  secret: function getSecret(context, callback) {
     console.log('\n--- getSecret called ---')
-    console.log('  number of args :', getSecret.length, '(actual:', arguments.length, ')')
-    console.log('  typeof 1st arg :', typeof requestOrToken)
-    console.log('  1st arg keys   :', Object.keys(requestOrToken ?? {}))
+    console.log('  operation      :', context.operation)
+    console.log('  has request?   :', !!context.request)
+    console.log('  header         :', context.header)
+    console.log('  payload        :', context.payload)
 
-    const isRequest = typeof requestOrToken?.jwtVerify === 'function'
-    console.log('  is Fastify req?:', isRequest)
-
-    if (isRequest) {
-      // Called by @fastify/jwt via request.jwtVerify()
-      // Signature: getSecret(request, decodedToken, callback)  ✅ correct
-      console.log('  context        : request.jwtVerify()')
-      console.log('  2nd arg (token):', tokenOrCallback)
-      console.log('  3rd arg (cb)   :', typeof maybeCallback)
-      console.log('--- end getSecret ---\n')
-      maybeCallback(null, SECRET)
+    if (context.request) {
+      console.log('  context        : called from request.jwtVerify()')
     } else {
-      // Called by fast-jwt (NOT @fastify/jwt) via fastify.jwt.verify()
-      // Signature: getSecret(decodedToken, callback)  ❌ inconsistent
-      // The 1st arg is the decoded JWT sections, NOT a request.
-      // The 2nd arg is a fast-jwt callback, NOT the decoded token.
-      console.log('  context        : fastify.jwt.verify() — called by fast-jwt, not @fastify/jwt!')
-      console.log('  1st arg IS the decoded token (no request!)')
-      console.log('  2nd arg type   :', typeof tokenOrCallback, '(fast-jwt callback)')
-      console.log('--- end getSecret ---\n')
-      tokenOrCallback(null, SECRET)
+      console.log('  context        : called from fastify.jwt.verify()')
     }
+
+    console.log('--- end getSecret ---\n')
+    callback(null, SECRET)
   }
 })
 
@@ -74,7 +63,9 @@ fastify.get('/verify-instance', async (request, reply) => {
 
   const token = auth.slice(7)
   try {
-    const payload = await fastify.jwt.verify(token)
+    const payload = await new Promise((resolve, reject) => {
+      fastify.jwt.verify(token, (err, result) => err ? reject(err) : resolve(result))
+    })
     return { ok: true, source: 'fastify.jwt.verify()', payload }
   } catch (err) {
     reply.code(500)
