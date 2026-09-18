@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["server.ts", "repro-jwks.ts", "test/local.types.test.ts"]
+}

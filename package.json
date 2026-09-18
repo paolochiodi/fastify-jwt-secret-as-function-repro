@@ -4,13 +4,23 @@
   "description": "Reproduction of @fastify/jwt secret-as-function inconsistency between request.jwtVerify() and fastify.jwt.verify()",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "tsx server.ts",
+    "repro-jwks": "tsx repro-jwks.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck",
+    "test:local": "tsc --project tsconfig.local.json --noEmit"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
+    "@fastify/jwt": "^10.2.2",
     "fastify": "^5",
-    "@fastify/jwt": "file:../fastify-jwt"
+    "fastify-jwt-jwks": "^3.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
   }
 }
